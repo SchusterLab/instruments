@@ -175,22 +175,17 @@ class N5242A(SocketInstrument):
     def save_file(self, fname):
         self.write('MMEMORY:STORE:FDATA \"' + fname + '\"')
 
-    def read_data(self, channel=1):
+    def read_data(self, channel=1, timeout=None):
         """Read current NWA Data, return fpts,mags,phases"""
-        #        self.write(":CALC1:PAR1:SEL")
-        #        self.write(":INIT1:CONT OFF")
-        #        self.write(":ABOR")
-        #        self.write(":FORM:DATA ASC")
-        # self.write(":CALC1:DATA:FDAT?")
-        #        self.write(":CALC1:DATA? FDATA")
-        # self.write("CALC:PAR 'CH1_S11_1',S21")
-        # self.write("CALC:PAR:SEL 'CH1_S11_1'")
+        if timeout == None:
+            timeout = self.query_timeout
         self.write("CALC:DATA? FDATA")
         data_str = ''
 
         done = False
         ii = 0
-        while not done:
+        start_time = time.time()
+        while (not done and (time.time() - start_time) < timeout) :
             time.sleep(self.query_sleep)
             ii += 1
             try:
@@ -212,7 +207,7 @@ class N5242A(SocketInstrument):
     def take_one_averaged_trace(self, fname=None):
         """Setup Network Analyzer to take a single averaged trace and grab data, either saving it to fname or returning it"""
         # print "Acquiring single trace"
-        self.set_trigger_source('BUS')
+        self.set_trigger_source('EXT')
         time.sleep(self.query_sleep * 2)
         old_timeout = self.get_timeout()
         # old_format=self.get_format()
@@ -233,7 +228,7 @@ class N5242A(SocketInstrument):
         self.set_format(old_format)
         self.set_query_timeout(old_timeout)
         self.set_trigger_average_mode(old_avg_mode)
-        self.set_trigger_source('INTERNAL')
+        self.set_trigger_source('IMM')
         self.set_format()
         return ans
 
@@ -263,6 +258,7 @@ class N5242A(SocketInstrument):
         self.set_query_timeout(self.query_timeout)
         print "====> self.query_timeout", self.query_timeout
         self.set_trigger_source('Ext')
+        self.set_active_trace(1)
         self.set_format('slog')
 
         self.set_span(segspan)
@@ -457,61 +453,6 @@ def nwa_watch_temperature_sweep(na, fridge, datapath, fileprefix, windows, power
             na.save_file("%s%04d-%3d-%s-%3.3f.csv" % (datapath, count, ii, fileprefix, Temperature))
             time.sleep(delay)
 
-def api_test(na):
-    """Test APIs"""
-    #### Test socket timeout
-    na.set_query_timeout(1000)
-    print "sending malformed query command"
-    na.query("malformed command")
-    print "command query timeout successful"
-
-    #### Test Driver Methods
-    print "test ===> set_default_state()"
-    na.set_default_state()
-    print "test ===> set_power(1, -20)"
-    na.set_power(-20, 1)
-    print "test ===> set_ifbw(1e3)"
-    na.set_ifbw(1e3)
-    print "test ===> get_ifbw()"
-    print na.get_ifbw()
-    print "test ===> set_averages(1)"
-    na.set_averages(1)
-
-    # Important Note: you have to set an active trace before setting the format of a trace.
-    print "test ===> set_active_trace(1)"
-    na.set_active_trace(1, 1, True)
-    print "test ===> set_active_trace(1)"
-    na.get_active_trace()
-    print "test ===> get_format(1)"
-    na.get_format(1)
-
-def read_data_test(na):
-    """Read NWA data and plot results"""
-    fpts, mags, phases = na.read_data()
-
-def nwa_segment_sweep_test(na):
-    """Test segmented Sweep"""
-    na.set_default_state()
-    na.set_power(-35, 1)
-    na.set_ifbw(1e3)
-    na.set_averages(1)
-
-    na.get_start_frequency()
-    na.get_stop_frequency()
-
-    freqs, mags, phases = na.segmented_sweep(2.45e9, 2.55e9, 50e3)
-
-def nwa_test3(na):
-    na.set_trigger_average_mode(False)
-    na.set_power(-20)
-    na.set_ifbw(1e3)
-    na.set_sweep_points()
-    na.set_averages(10)
-    na.set_average_state(True)
-
-    print na.get_settings()
-    na.clear_averages()
-    na.take_one_averaged_trace("test.csv")
 
 
 def convert_nwa_files_to_hdf(nwa_file_dir, h5file, sweep_min, sweep_max, sweep_label="B Field", ext=".CSV"):
@@ -538,9 +479,3 @@ def convert_nwa_files_to_hdf(nwa_file_dir, h5file, sweep_min, sweep_max, sweep_l
 if __name__ == '__main__':
     na = N5242A("N5242A", address="192.168.14.242")
     print na.get_id()
-    print "Setting window"
-
-    api_test(na)
-    nwa_segment_sweep_test(na)
-    # nwa_test3(na)
-    # nwa_test3(na)
