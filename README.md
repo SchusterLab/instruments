@@ -3,10 +3,10 @@
 ## Important
 
 - This module should have only external dependency on publicly available modules. For example, no dependency on private Schuster Lab packages.
-- Each instrument should be inside a sub folder. This makes it easy to attach a README.md for that instrument.
+- Each instrument should be inside a sub folder. This makes it easy to attach a `README.md` for that instrument.
 - Each instrument should have a `<instrument_name>_test.py` file.
-   - this test file should have a function called `api_test(instrument)` that tests the low-level apis.
-   - behaviral tests should be in a second function, and should be separate from the low-level api tests.
+   - this test file should have a function called `api_test(instrument_instance)` that tests the low-level apis.
+   - behavioral tests should be in a second function, and should be separate from the low-level api tests.
    - a test `instrument.cfg` file is included in each folder, and excluded from version control in `.gitignore`, to allow developers to have their own instrument.cfg during development.
 - Each instrument should have a `README.md` file. It should be sweet and useful.
 
