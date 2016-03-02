@@ -32,11 +32,18 @@ class Instrument(object):
     term_char = '\n'  # character to be appended to all writes
     # operation_range={}        #map to hold the operation range
 
-    def __init__(self, name, address='', enabled=True, timeout=10):
+    def __init__(self, name, address='', enabled=True, query_timeout=1000):
+        """
+        :param name:
+        :param address:
+        :param enabled:
+        :param query_timeout: timeout for low-level queries in milliseconds
+        :return:
+        """
         self.name = name
         self.address = address
         self.enabled = enabled
-        self.timeout = timeout # timeout for commands
+        self.query_timeout = query_timeout # timeout for connection, different from timeout for query
 
     def get_name(self):
         return self.name
@@ -53,8 +60,8 @@ class Instrument(object):
         time.sleep(self.query_sleep)
         return self.read(timeout)
 
-    def set_timeout(self, timeout):
-        self.timeout = timeout
+    def set_query_timeout(self, timeout):
+        self.query_timeout = timeout
 
     def get_timeout(self):
         return self.timeout
@@ -82,14 +89,14 @@ class Instrument(object):
 
 
 class VisaInstrument(Instrument):
-    def __init__(self, name, address='', enabled=True, timeout=1.0, **kwargs):
-        Instrument.__init__(self, name, address, enabled)
+    def __init__(self, name, address='', enabled=True, query_timeout=1.0, **kwargs):
+        Instrument.__init__(self, name, address, enabled, query_timeout, **kwargs)
         if self.enabled:
             self.protocol = 'VISA'
-            self.timeout = timeout
+            self.query_timeout = query_timeout
             address = address.upper()
             print address
-        self.instrument = visa.Instrument(address, timeout=timeout, **kwargs)
+        self.instrument = visa.Instrument(address, timeout=query_timeout, **kwargs)
 
     def write(self, s):
         if self.enabled: self.instrument.write(s + self.term_char)
@@ -106,8 +113,8 @@ class VisaInstrument(Instrument):
 #        if self.enabled: self.close()
 
 class TelnetInstrument(Instrument):
-    def __init__(self, name, address='', enabled=True, timeout=10):
-        Instrument.__init__(self, name, address, enabled)
+    def __init__(self, name, address='', enabled=True, query_timeout=10):
+        Instrument.__init__(self, name, address, enabled, query_timeout, **kwargs)
         self.protocol = 'Telnet'
         if len(address.split(':')) > 1:
             self.port = int(address.split(':')[1])
@@ -133,8 +140,8 @@ import select
 class SocketInstrument(Instrument):
     default_port = 23
 
-    def __init__(self, name, address='', enabled=True, recv_length=1024, **kwargs):
-        Instrument.__init__(self, name, address, enabled, **kwargs)
+    def __init__(self, name, address='', enabled=True, recv_length=1024, query_timeout=1000, **kwargs):
+        Instrument.__init__(self, name, address, enabled, query_timeout, **kwargs)
         self.protocol = 'socket'
         self.recv_length = recv_length
         if len(address.split(':')) > 1:
@@ -149,30 +156,30 @@ class SocketInstrument(Instrument):
         if self.enabled:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((self.ip, self.port))
-            self.set_timeout(self.timeout)
+            self.set_query_timeout(self.query_timeout)
             self.socket.setblocking(0)
 
     def set_enable(self, enable=True):
-        self.enabled = enable;
+        self.enabled = enable
         self.on_enable()
-
-    def set_timeout(self, timeout):
-        Instrument.set_timeout(self, timeout)
-        if self.enabled:
-            print 'setting timeout to %s' % self.timeout
-            self.socket.settimeout(self.timeout)
 
     def write(self, s):
         if self.enabled: self.socket.send(s + self.term_char)
 
     def read(self, timeout=None):
-        if timeout == None: timeout = self.timeout;
-        ready = select.select([self.socket], [], [], timeout)
+        # Note: make sure you use query_timeout instead of timeout. self.timeout is for
+        # timeout/wait before connection only.
+        #
+        # Note: timeout is in milliseconds, not in seconds.
+        #
+        if timeout == None: timeout = self.query_timeout
+        ready = select.select([self.socket], [], [], timeout/1000.0)
         if (ready[0] and self.enabled):
             return self.socket.recv(self.recv_length)
 
 class SerialInstrument(Instrument):
-    def __init__(self, name, address, enabled=True, timeout=1.0,
+    # todo: the `baudrate` and `querysleep` need to be updated to band_rate and query_sleep
+    def __init__(self, name, address, enabled=True, query_timeout=1.0,
                  recv_length=1024, baudrate=9600, querysleep=1):
         Instrument.__init__(self, name, address, enabled)
         self.protocol = 'serial'
@@ -186,13 +193,17 @@ class SerialInstrument(Instrument):
                 #    except: raise ValueError
             except serial.SerialException:
                 print 'Cannot create a connection to port ' + str(address) + '.\n'
-        self.set_timeout(timeout)
+        self.set_query_timeout(query_timeout)
         self.recv_length = recv_length
         self.query_sleep = querysleep
 
-    def set_timeout(self, timeout):
-        Instrument.set_timeout(self, timeout)
-        if self.enabled: self.ser.setTimeout(self.timeout)
+    # todo: `set_timeout` is deprecated because of conflicting meanings from different libraries. A `set_query_timeout` should be implemented
+    # def set_query_timeout(self, timeout):
+    #     Instrument.set_query_timeout(self, timeout)
+    #     if self.enabled: self.ser.setTimeout(self.query_timeout)
+
+    def test(self):
+        self.ser.setTimeout(self.timeout)
 
     def set_query_sleep(self, querysleep):
         self.query_sleep = querysleep

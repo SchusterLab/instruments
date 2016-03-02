@@ -216,7 +216,7 @@ class N5242A(SocketInstrument):
         time.sleep(self.query_sleep * 2)
         old_timeout = self.get_timeout()
         # old_format=self.get_format()
-        self.set_timeout(self.timeout)
+        self.set_query_timeout(self.query_timeout)
         self.set_format()
         time.sleep(self.query_sleep)
         old_avg_mode = self.get_trigger_average_mode()
@@ -231,7 +231,7 @@ class N5242A(SocketInstrument):
         ans = self.read_data()
         time.sleep(self.query_sleep)
         self.set_format(old_format)
-        self.set_timeout(old_timeout)
+        self.set_query_timeout(old_timeout)
         self.set_trigger_average_mode(old_avg_mode)
         self.set_trigger_source('INTERNAL')
         self.set_format()
@@ -260,7 +260,8 @@ class N5242A(SocketInstrument):
         old_format = self.get_format()
         old_timeout = self.get_timeout()
 
-        self.set_timeout(self.timeout)
+        self.set_query_timeout(self.query_timeout)
+        print "====> self.query_timeout", self.query_timeout
         self.set_trigger_source('Ext')
         self.set_format('slog')
 
@@ -284,7 +285,7 @@ class N5242A(SocketInstrument):
         segs.append(np.array([last]).transpose())
         time.sleep(self.query_sleep)
         self.set_format(old_format)
-        self.set_timeout(old_timeout)
+        self.set_query_timeout(old_timeout)
         self.set_trigger_average_mode(old_avg_mode)
         self.set_trigger_source('IMM')
 
@@ -315,7 +316,7 @@ class N5242A(SocketInstrument):
         old_timeout = self.get_timeout()
         old_avg_mode = self.get_trigger_average_mode()
 
-        self.set_timeout(self.timeout)
+        self.set_query_timeout(self.query_timeout)
         self.set_trigger_average_mode(True)
         self.set_trigger_source('BUS')
         self.set_format('mlog')
@@ -342,7 +343,7 @@ class N5242A(SocketInstrument):
         segs.append(np.array([last]).transpose())
         time.sleep(self.query_sleep)
         self.set_format(old_format)
-        self.set_timeout(old_timeout)
+        self.set_query_timeout(old_timeout)
         self.set_trigger_average_mode(old_avg_mode)
         self.set_trigger_source('INTERNAL')
         ans = np.hstack(segs)
@@ -390,7 +391,7 @@ class N5242A(SocketInstrument):
         pass
         # self.set_trigger_source('BUS')
         # self.set_trigger_average_mode(True)
-        # self.set_timeout(self.timeout)
+        # self.set_query_timeout(self.query_timeout)
         # self.set_format('slog')
 
     def set_default_state(self):
@@ -436,7 +437,7 @@ def nwa_watch_temperature_sweep(na, fridge, datapath, fileprefix, windows, power
     na.set_trigger_average_mode(True)
     na.set_sweep_points()
     na.set_average_state(True)
-    na.set_timeout(timeout)
+    na.set_query_timeout(timeout)
     na.set_format('slog')
     na.set_trigger_source('BUS')
     count = 0
@@ -456,28 +457,10 @@ def nwa_watch_temperature_sweep(na, fridge, datapath, fileprefix, windows, power
             na.save_file("%s%04d-%3d-%s-%3.3f.csv" % (datapath, count, ii, fileprefix, Temperature))
             time.sleep(delay)
 
-def nwa_API_test(na):
-    pass
-
-def nwa_test1(na):
-    """Read NWA data and plot results"""
-    fpts, mags, phases = na.read_data()
-
-    figure(1)
-    subplot(2, 1, 1)
-    xlabel("Frequency (GHz)")
-    ylabel("Transmission, S21 (dB)")
-    plot(fpts / 1e9, mags)
-    subplot(2, 1, 2)
-    xlabel("Frequency (GHz)")
-    ylabel("Transmitted Phase (deg)")
-    plot(fpts / 1e9, phases)
-    show()
-
 def api_test(na):
     """Test APIs"""
     #### Test socket timeout
-    na.set_timeout(1)
+    na.set_query_timeout(1000)
     print "sending malformed query command"
     na.query("malformed command")
     print "command query timeout successful"
@@ -502,6 +485,9 @@ def api_test(na):
     print "test ===> get_format(1)"
     na.get_format(1)
 
+def read_data_test(na):
+    """Read NWA data and plot results"""
+    fpts, mags, phases = na.read_data()
 
 def nwa_segment_sweep_test(na):
     """Test segmented Sweep"""
@@ -550,7 +536,6 @@ def convert_nwa_files_to_hdf(nwa_file_dir, h5file, sweep_min, sweep_max, sweep_l
 
 
 if __name__ == '__main__':
-    #    condense_nwa_files(r'C:\\Users\\dave\\Documents\\My Dropbox\\UofC\\code\\004 - test temperature sweep\\sweep data','C:\\Users\\dave\\Documents\\My Dropbox\\UofC\\code\\004 - test temperature sweep\\sweep data\\test')
     na = N5242A("N5242A", address="192.168.14.242")
     print na.get_id()
     print "Setting window"
