@@ -9,5 +9,7 @@ setup(name='Instruments',
       author_email='yangge1987@gmail.com',
       url='https://www.github.com/SchusterLab/instruments',
       packages=['instruments'],
-     )
-
+      download_url='https://github.com/SchusterLab/instruments/tarball/0.5.0',
+      keywords=['Scientific Experimentation', 'instrumentation', 'drivers'],
+      classifiers=[]
+      )
