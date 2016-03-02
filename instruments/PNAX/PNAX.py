@@ -234,9 +234,9 @@ class N5242A(SocketInstrument):
         self.set_format()
         return ans
 
-    def segmented_sweep(self, start, stop, step):
+    def segmented_sweep(self, start, stop, step, output_format='polar'):
         """Take a segmented sweep to achieve higher resolution"""
-        max_sweep_points = 4000;
+        max_sweep_points = 4000
         span = stop - start
         total_sweep_pts = span / step
         if total_sweep_pts <= max_sweep_points:
@@ -246,6 +246,7 @@ class N5242A(SocketInstrument):
         starts = start + segspan * np.arange(0, segments)
         stops = starts + segspan
 
+
         print span
         print segments
         print segspan
@@ -254,14 +255,15 @@ class N5242A(SocketInstrument):
         time.sleep(self.query_sleep)
         return [0, 0, 0]
 
-        old_format = self.get_format()
-        old_timeout = self.get_timeout()
+        current_format = self.get_format()
+        current_timeout = self.get_timeout()
 
         self.set_query_timeout(self.query_timeout)
         print "====> self.query_timeout", self.query_timeout
         self.set_trigger_source('Ext')
         self.set_active_trace(1)
-        self.set_format('slog')
+        # only the polar and smith are outputing two number per data point
+        self.set_format(trace_format=output_format)
 
         self.set_span(segspan)
         segs = []
@@ -282,8 +284,9 @@ class N5242A(SocketInstrument):
             segs.append(seg_data)
         segs.append(np.array([last]).transpose())
         time.sleep(self.query_sleep)
-        self.set_format(old_format)
-        self.set_query_timeout(old_timeout)
+
+        self.set_format(trace_format=current_format)
+        self.set_query_timeout(current_timeout)
         self.set_trigger_average_mode(old_avg_mode)
         self.set_trigger_source('IMM')
 

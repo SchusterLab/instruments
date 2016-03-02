@@ -16,13 +16,14 @@ class MyTestCase(unittest.TestCase):
         self.api_test()
         self.read_data_test_MLOG()
         self.read_data_test_Polar()
+        self.nwa_segment_sweep_test()
 
     def query_timeout_test(self):
         #### Test socket timeout
         self.na.set_query_timeout(1000)
         print "sending malformed command"
         self.na.query("malformed command")
-        self.assertTrue(True, 'query timeout works')
+        # self.assertTrue(True, 'query timeout works')
 
     def api_test(self):
         """Test APIs"""
@@ -81,8 +82,7 @@ class MyTestCase(unittest.TestCase):
         self.na.get_start_frequency()
         self.na.get_stop_frequency()
 
-        self.na.set_format('polar')
-        fpts, mags, phases = self.na.segmented_sweep(2.45e9, 2.55e9, 50e3)
+        fpts, mags, phases = self.na.segmented_sweep(2.45e9, 2.55e9, 50e3, 'polar')
 
         plt.figure()
         plt.plot(fpts, mags)
