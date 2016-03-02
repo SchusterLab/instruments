@@ -63,8 +63,8 @@ class Instrument(object):
     def set_query_timeout(self, timeout):
         self.query_timeout = timeout
 
-    def get_timeout(self):
-        return self.timeout
+    def get_query_timeout(self):
+        return self.query_timeout
 
     def get_settings(self):
         settings = {}

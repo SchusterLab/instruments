@@ -14,7 +14,6 @@ import numpy as np
 import glob
 import os.path
 
-
 class N5242A(SocketInstrument):
     MAXSWEEPPTS = 1601
     default_port = 5025
@@ -91,17 +90,17 @@ class N5242A(SocketInstrument):
         self.write("*OPC?")
         self.read()
 
-    def trigger_single(self):
-        self.write(':TRIG:SING')
+    def trigger_single(self, channel=1):
+        self.write('initiate%d:immediate' % channel)
 
-    # Looks like this is not availbale on PNAX
-    # def set_trigger_average_mode(self,state=True):
-    #     if state: self.write(':TRIG:AVER ON')
-    #     else: self.write(':TRIG:AVER OFF')
+    def set_trigger_average_mode(self, state=True):
+        if state:
+            self.write('sense:AVER ON')
+        else:
+            self.write('sense:AVER OFF')
 
-    # Looks like PNAX does not have get trig average mode.
-    # def get_trigger_average_mode(self):
-    #     return bool(self.query(':TRIG:AVER?'))
+    def get_trigger_average_mode(self):
+        return bool(self.query('sense:AVER?'))
 
     def set_trigger_source(self, source="immediate"):  # IMMEDIATE, MANUAL, EXTERNAL
         allowed_sources = ['ext', 'imm', 'man', 'immediate', 'external', 'manual']
@@ -130,8 +129,10 @@ class N5242A(SocketInstrument):
     def get_output(self):
         return bool(self.query(":OUTPUT?"))
 
-    def set_measure(self, mode='S21'):
-        self.write(":CALC1:PAR1:DEF %s" % (mode))
+    def set_measure(self, mode='S21', channel=1):
+        # todo: need to fixed
+        print ""
+        self.write("calculate%d:parameter:define 'ch1_a', %s" % (channel, mode))
 
     #### Trace Operations
     def set_active_trace(self, channel=1, trace=1, fast=False):
@@ -211,7 +212,7 @@ class N5242A(SocketInstrument):
         # print "Acquiring single trace"
         self.set_trigger_source('EXT')
         time.sleep(self.query_sleep * 2)
-        old_timeout = self.get_timeout()
+        old_timeout = self.get_query_timeout()
         # old_format=self.get_format()
         self.set_query_timeout(self.query_timeout)
         self.set_format()
@@ -222,7 +223,7 @@ class N5242A(SocketInstrument):
         self.trigger_single()
         time.sleep(self.query_sleep)
         self.averaging_complete()  # Blocks!
-        self.set_format('SLOG ')
+        self.set_format('SLOG')
         if fname is not None:
             self.save_file(fname)
         ans = self.read_data()
@@ -245,22 +246,17 @@ class N5242A(SocketInstrument):
         segspan = span / segments
         starts = start + segspan * np.arange(0, segments)
         stops = starts + segspan
+        print "full span is %f GHz, in %d segments, with a span of %fMHz each" % (span / 1e9, segments, segspan / 1e6)
 
-
-        print span
-        print segments
-        print segspan
+        time.sleep(self.query_sleep)
 
         # Set Save old settings and set up for automated data taking
-        time.sleep(self.query_sleep)
-        return [0, 0, 0]
-
-        current_format = self.get_format()
-        current_timeout = self.get_timeout()
+        original_output_format = self.get_format()
+        original_timeout = self.get_query_timeout()
+        original_trigger_average_mode = self.get_trigger_average_mode()
 
         self.set_query_timeout(self.query_timeout)
-        print "====> self.query_timeout", self.query_timeout
-        self.set_trigger_source('Ext')
+        self.set_trigger_source('manual')
         self.set_active_trace(1)
         # only the polar and smith are outputing two number per data point
         self.set_format(trace_format=output_format)
@@ -268,6 +264,7 @@ class N5242A(SocketInstrument):
         self.set_span(segspan)
         segs = []
         for start, stop in zip(starts, stops):
+            print '.',
             self.set_start_frequency(start)
             self.set_stop_frequency(stop)
 
@@ -285,9 +282,9 @@ class N5242A(SocketInstrument):
         segs.append(np.array([last]).transpose())
         time.sleep(self.query_sleep)
 
-        self.set_format(trace_format=current_format)
-        self.set_query_timeout(current_timeout)
-        self.set_trigger_average_mode(old_avg_mode)
+        self.set_format(trace_format=original_output_format)
+        self.set_query_timeout(original_timeout)
+        self.set_trigger_average_mode(original_trigger_average_mode)
         self.set_trigger_source('IMM')
 
         return np.hstack(segs)
@@ -314,7 +311,7 @@ class N5242A(SocketInstrument):
         # Set Save old settings and set up for automated data taking
         time.sleep(self.query_sleep)
         old_format = self.get_format()
-        old_timeout = self.get_timeout()
+        old_timeout = self.get_query_timeout()
         old_avg_mode = self.get_trigger_average_mode()
 
         self.set_query_timeout(self.query_timeout)

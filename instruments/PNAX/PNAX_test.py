@@ -23,7 +23,7 @@ class MyTestCase(unittest.TestCase):
         self.na.set_query_timeout(1000)
         print "sending malformed command"
         self.na.query("malformed command")
-        # self.assertTrue(True, 'query timeout works')
+        self.assertTrue(True, 'query timeout works')
 
     def api_test(self):
         """Test APIs"""
@@ -50,6 +50,15 @@ class MyTestCase(unittest.TestCase):
 
         print "test ===> set_trigger_source('Ext')"
         self.na.set_trigger_source('Ext')
+        print "test ===> set_trigger_average_mode(True)"
+        self.na.set_trigger_average_mode(True)
+        print "test ===> set_trigger_average_mode(False)"
+        self.na.set_trigger_average_mode(False)
+        print "test ===> get_trigger_average_mode()"
+        print self.na.get_trigger_average_mode()
+
+        print "test ===> set_measure('S21')"
+        self.na.set_measure('S21')
 
     def read_data_test_MLOG(self):
         """Read NWA data and plot results"""
@@ -57,9 +66,9 @@ class MyTestCase(unittest.TestCase):
         self.na.set_format('mlog')
         fpts, mags = self.na.read_data()
 
-        plt.figure()
-        plt.plot(fpts, mags)
-        plt.show()
+        # plt.figure()
+        # plt.plot(fpts, mags)
+        # plt.show()
 
     def read_data_test_Polar(self):
         """Read NWA data and plot results"""
@@ -67,10 +76,10 @@ class MyTestCase(unittest.TestCase):
         self.na.set_format('polar')
         fpts, mags, phases = self.na.read_data()
 
-        plt.figure()
-        plt.plot(fpts, mags)
-        plt.plot(fpts, phases)
-        plt.show()
+        # plt.figure()
+        # plt.plot(fpts, mags)
+        # plt.plot(fpts, phases)
+        # plt.show()
 
     def nwa_segment_sweep_test(self):
         """Test segmented Sweep"""
@@ -82,10 +91,13 @@ class MyTestCase(unittest.TestCase):
         self.na.get_start_frequency()
         self.na.get_stop_frequency()
 
-        fpts, mags, phases = self.na.segmented_sweep(2.45e9, 2.55e9, 50e3, 'polar')
+        self.na.set_query_timeout(40e3)
+        self.na.set_format('mlog')
+        fpts, mags, phases = self.na.segmented_sweep(2.3e9, 2.5e9, 5e3, 'polar')
 
         plt.figure()
         plt.plot(fpts, mags)
+        plt.plot(fpts, phases)
         plt.show()
 
     def nwa_test3(self):
