@@ -1,6 +1,9 @@
+# Custom Ignores
+**/instrument.cfg
+
+
 # pycharm meta files
 .idea
-
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
