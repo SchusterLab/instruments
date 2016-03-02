@@ -1,5 +1,9 @@
 # instruments
 
+## Important
+
+- This module should have only external dependency on publicly available modules. For example, no dependency on private Schuster Lab packages.
+
 ## How to Use
 
 There are two ways to install this instrument driver collection.
