@@ -12,9 +12,10 @@ class MyTestCase(unittest.TestCase):
         self.na = test_instrument
 
     def runTest(self):
-        self.query_timeout_test()
+        # self.query_timeout_test()
         self.api_test()
-        self.read_data_test()
+        self.read_data_test_MLOG()
+        self.read_data_test_Polar()
 
     def query_timeout_test(self):
         #### Test socket timeout
@@ -49,13 +50,26 @@ class MyTestCase(unittest.TestCase):
         print "test ===> set_trigger_source('Ext')"
         self.na.set_trigger_source('Ext')
 
-    def read_data_test(self):
+    def read_data_test_MLOG(self):
         """Read NWA data and plot results"""
+        self.na.set_query_timeout(10e3)
+        self.na.set_format('mlog')
+        fpts, mags = self.na.read_data()
+
+        plt.figure()
+        plt.plot(fpts, mags)
+        plt.show()
+
+    def read_data_test_Polar(self):
+        """Read NWA data and plot results"""
+        self.na.set_query_timeout(10e3)
+        self.na.set_format('polar')
         fpts, mags, phases = self.na.read_data()
 
-        # plt.figure()
-        # # plt.plot(fpts, mags)
-        # plt.show()
+        plt.figure()
+        plt.plot(fpts, mags)
+        plt.plot(fpts, phases)
+        plt.show()
 
     def nwa_segment_sweep_test(self):
         """Test segmented Sweep"""
@@ -67,7 +81,12 @@ class MyTestCase(unittest.TestCase):
         self.na.get_start_frequency()
         self.na.get_stop_frequency()
 
-        freqs, mags, phases = self.na.segmented_sweep(2.45e9, 2.55e9, 50e3)
+        self.na.set_format('polar')
+        fpts, mags, phases = self.na.segmented_sweep(2.45e9, 2.55e9, 50e3)
+
+        plt.figure()
+        plt.plot(fpts, mags)
+        plt.show()
 
     def nwa_test3(self):
         self.na.set_trigger_average_mode(False)

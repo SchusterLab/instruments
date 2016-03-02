@@ -14,6 +14,7 @@ import numpy as np
 import glob
 import os.path
 
+
 class N5242A(SocketInstrument):
     MAXSWEEPPTS = 1601
     default_port = 5025
@@ -90,7 +91,7 @@ class N5242A(SocketInstrument):
         self.write("*OPC?")
         self.read()
 
-    def trigger_single (self):
+    def trigger_single(self):
         self.write(':TRIG:SING')
 
     # Looks like this is not availbale on PNAX
@@ -103,7 +104,7 @@ class N5242A(SocketInstrument):
     #     return bool(self.query(':TRIG:AVER?'))
 
     def set_trigger_source(self, source="immediate"):  # IMMEDIATE, MANUAL, EXTERNAL
-        allowed_sources =  ['ext', 'imm', 'man', 'immediate', 'external', 'manual']
+        allowed_sources = ['ext', 'imm', 'man', 'immediate', 'external', 'manual']
         if source.lower() not in allowed_sources:
             raise "source need to be one of " + allowed_sources
         self.write(':TRIG:SEQ:SOUR ' + source)
@@ -131,7 +132,6 @@ class N5242A(SocketInstrument):
 
     def set_measure(self, mode='S21'):
         self.write(":CALC1:PAR1:DEF %s" % (mode))
-
 
     #### Trace Operations
     def set_active_trace(self, channel=1, trace=1, fast=False):
@@ -175,32 +175,34 @@ class N5242A(SocketInstrument):
     def save_file(self, fname):
         self.write('MMEMORY:STORE:FDATA \"' + fname + '\"')
 
+    def read_line(self, eof_char='\n', timeout=None):
+        if timeout is None:
+            timeout = self.query_timeout
+        done = False
+        while done is False:
+            buffer_str = self.read(timeout)
+            # print "buffer_str", buffer_str
+            yield buffer_str
+            if buffer_str[-1] == eof_char:
+                done = True
+
     def read_data(self, channel=1, timeout=None):
         """Read current NWA Data, return fpts,mags,phases"""
+        # Note: referece is here: http://na.support.keysight.com/pna/help/latest/Programming/GP-IB_Command_Finder/Calculate/Data.htm
         if timeout == None:
             timeout = self.query_timeout
-        self.write("CALC:DATA? FDATA")
-        data_str = ''
-
-        done = False
-        ii = 0
-        start_time = time.time()
-        while (not done and (time.time() - start_time) < timeout) :
-            time.sleep(self.query_sleep)
-            ii += 1
-            try:
-                s = self.read()
-            except:
-                print "read %d failed!" % ii
-            data_str += s
-            done = data_str[-1] == '\n'
-        # print data_str
+        self.write("CALC%d:DATA? FDATA" % channel)
+        data_str = ''.join(self.read_line(timeout=timeout))
+        # print 'data_str ==>"', data_str, '"'
         data = np.fromstring(data_str, dtype=float, sep=',')
-        data = data.reshape((-1, 2))
-        data = data.transpose()
-        # self.data=data
-        fpts = np.linspace(self.get_start_frequency(), self.get_stop_frequency(), len(data[0]))
-        return np.vstack((fpts, data))
+        number_of_sweep_points = self.get_sweep_points()
+        fpts = np.linspace(self.get_start_frequency(), self.get_stop_frequency(), number_of_sweep_points)
+        if len(data) == 2 * number_of_sweep_points:
+            data = data.reshape((-1, 2))
+            data = data.transpose()
+            return np.vstack((fpts, data))
+        else:
+            return np.vstack((fpts, data))
 
     #### Meta
 
@@ -452,7 +454,6 @@ def nwa_watch_temperature_sweep(na, fridge, datapath, fileprefix, windows, power
             na.averaging_complete()  # Blocks!
             na.save_file("%s%04d-%3d-%s-%3.3f.csv" % (datapath, count, ii, fileprefix, Temperature))
             time.sleep(delay)
-
 
 
 def convert_nwa_files_to_hdf(nwa_file_dir, h5file, sweep_min, sweep_max, sweep_label="B Field", ext=".CSV"):
