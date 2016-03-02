@@ -7,6 +7,7 @@ There are two ways to install this instrument driver collection.
 ### 1. from github
 
 do: `pip install git+git://github.com/SchusterLab/instruments.git@master`
+![pip install from git](pip_install_from_git.png]
 
 ### 2. from pip
 
