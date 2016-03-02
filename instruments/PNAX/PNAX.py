@@ -18,8 +18,8 @@ class N5242A(SocketInstrument):
     MAXSWEEPPTS = 1601
     default_port = 5025
 
-    def __init__(self, name="E5071", address=None, enabled=True):
-        SocketInstrument.__init__(self, name, address, enabled=enabled, timeout=10, recv_length=2 ** 20)
+    def __init__(self, name="E5071", address=None, enabled=True, **kwargs):
+        SocketInstrument.__init__(self, name, address, enabled=enabled, recv_length=2 ** 20, **kwargs)
         self.query_sleep = 0.05
 
     def get_id(self):
@@ -216,7 +216,7 @@ class N5242A(SocketInstrument):
         time.sleep(self.query_sleep * 2)
         old_timeout = self.get_timeout()
         # old_format=self.get_format()
-        self.set_timeout(10000)
+        self.set_timeout(self.timeout)
         self.set_format()
         time.sleep(self.query_sleep)
         old_avg_mode = self.get_trigger_average_mode()
@@ -239,11 +239,12 @@ class N5242A(SocketInstrument):
 
     def segmented_sweep(self, start, stop, step):
         """Take a segmented sweep to achieve higher resolution"""
+        max_sweep_points = 4000;
         span = stop - start
         total_sweep_pts = span / step
-        if total_sweep_pts <= 1601:
+        if total_sweep_pts <= max_sweep_points:
             print "Segmented sweep unnecessary"
-        segments = np.ceil(total_sweep_pts / 1600.)
+        segments = np.ceil(total_sweep_pts / max_sweep_points)
         segspan = span / segments
         starts = start + segspan * np.arange(0, segments)
         stops = starts + segspan
@@ -259,7 +260,7 @@ class N5242A(SocketInstrument):
         old_format = self.get_format()
         old_timeout = self.get_timeout()
 
-        self.set_timeout(10000)
+        self.set_timeout(self.timeout)
         self.set_trigger_source('Ext')
         self.set_format('slog')
 
@@ -314,7 +315,7 @@ class N5242A(SocketInstrument):
         old_timeout = self.get_timeout()
         old_avg_mode = self.get_trigger_average_mode()
 
-        self.set_timeout(10000)
+        self.set_timeout(self.timeout)
         self.set_trigger_average_mode(True)
         self.set_trigger_source('BUS')
         self.set_format('mlog')
@@ -389,7 +390,7 @@ class N5242A(SocketInstrument):
         pass
         # self.set_trigger_source('BUS')
         # self.set_trigger_average_mode(True)
-        # self.set_timeout(10000)
+        # self.set_timeout(self.timeout)
         # self.set_format('slog')
 
     def set_default_state(self):
@@ -474,7 +475,14 @@ def nwa_test1(na):
     show()
 
 def api_test(na):
-    """Test segmented Sweep"""
+    """Test APIs"""
+    #### Test socket timeout
+    na.set_timeout(1)
+    print "sending malformed query command"
+    na.query("malformed command")
+    print "command query timeout successful"
+
+    #### Test Driver Methods
     print "test ===> set_default_state()"
     na.set_default_state()
     print "test ===> set_power(1, -20)"
