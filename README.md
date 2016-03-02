@@ -15,7 +15,12 @@ do `pip install instruments`
 
 ### 3. for local development
 
-inside your github `instruments` folder, do `pip install -e .`. This is equivalent to `python setup.py develop`. See here: [stackoverflow](http://stackoverflow.com/questions/2087148/can-i-use-pip-instead-of-easy-install-for-python-setup-py-install-dependen).
+- First, clone this repository with
+   ```shell
+   git clone https://github.com/SchusterLab/instruments.git
+   ```
+
+- Then inside your github `instruments` folder, do `pip install -e .`. This is equivalent to `python setup.py develop`. See here: [stackoverflow](http://stackoverflow.com/questions/2087148/can-i-use-pip-instead-of-easy-install-for-python-setup-py-install-dependen).
 
 ## To Contribute:
 
