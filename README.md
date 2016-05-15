@@ -41,6 +41,10 @@ To help fix bugs and create new drivers, and help make everyone's life easier in
 1. Always write tests for your code.
 2. Write up the README nicely, so that the first-year in your lab knows how to use this.
 
+### How to Run Test?
+
+to run test, just use the PyCharm integration and run the test file in each folder.
+
 Many thanks to you future contributors in advance!
 
 Ge Yang
