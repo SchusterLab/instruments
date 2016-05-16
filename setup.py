@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from setuptools import setup, find_packages
+from distutils.core import setup
 
 setup(name='Instruments',
       version='0.6.0',
@@ -8,7 +8,7 @@ setup(name='Instruments',
       author='Ge Yang',
       author_email='yangge1987@gmail.com',
       url='https://www.github.com/SchusterLab/instruments',
-      packages=find_packages(),
+      packages=["Instruments", "Instruments.PNAX", "Instruments.Cryostat"],
       download_url='https://github.com/SchusterLab/instruments/tarball/0.5.0',
       keywords=['Scientific Experimentation', 'instrumentation', 'drivers'],
       classifiers=[]

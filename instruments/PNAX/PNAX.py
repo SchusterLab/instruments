@@ -14,6 +14,7 @@ import numpy as np
 import glob
 import os.path
 
+
 class N5242A(SocketInstrument):
     MAXSWEEPPTS = 1601
     default_port = 5025
@@ -207,33 +208,30 @@ class N5242A(SocketInstrument):
 
     #### Meta
 
-    def take_one_averaged_trace(self, fname=None):
-        """Setup Network Analyzer to take a single averaged trace and grab data, either saving it to fname or returning it"""
-        # print "Acquiring single trace"
-        self.set_trigger_source('EXT')
-        time.sleep(self.query_sleep * 2)
-        old_timeout = self.get_query_timeout()
-        # old_format=self.get_format()
-        self.set_query_timeout(self.query_timeout)
-        self.set_format()
-        time.sleep(self.query_sleep)
-        old_avg_mode = self.get_trigger_average_mode()
-        self.set_trigger_average_mode(True)
-        self.clear_averages()
-        self.trigger_single()
-        time.sleep(self.query_sleep)
-        self.averaging_complete()  # Blocks!
-        self.set_format('SLOG')
-        if fname is not None:
-            self.save_file(fname)
-        ans = self.read_data()
-        time.sleep(self.query_sleep)
+    def take_one(self):
+        """Tell Network Analyzer to take a single averaged trace and grab data,
+        either saving it to fname or returning it.  This function does not set up
+        the format or anything else it just starts, blocks, and grabs the next trace."""
+
+        old_trigger_source = self.get_trigger_source()
+        self.set_trigger_source("manual")
+        old_format = self.get_format()
+        self.set_format('polar')
+        self.clear_averages(channel=1)
+        self.trigger_single(channel=1)
+        fpts, xs, ys = self.read_data()
+        self.set_trigger_source(old_trigger_source)
         self.set_format(old_format)
-        self.set_query_timeout(old_timeout)
-        self.set_trigger_average_mode(old_avg_mode)
-        self.set_trigger_source('IMM')
-        self.set_format()
-        return ans
+        return fpts, xs, ys
+
+    def take_one_with_average(self, avg=None):
+        if avg is None:
+            return self.take_one()
+        else:
+            self.set_averages(avg)
+            self.set_trigger_average_mode()
+            return self.take_one()
+
 
     def segmented_sweep(self, start, stop, step, output_format='polar'):
         """Take a segmented sweep to achieve higher resolution"""
@@ -347,21 +345,6 @@ class N5242A(SocketInstrument):
         ans = np.hstack(segs)
         if fname is not None:
             np.savetxt(fname, np.transpose(ans), delimiter=',')
-        return ans
-
-    def take_one(self, fname=None):
-        """Tell Network Analyzer to take a single averaged trace and grab data,
-        either saving it to fname or returning it.  This function does not set up
-        the format or anything else it just starts, blocks, and grabs the next trace."""
-        self.write('SENS:SWE:MODE HOLD')
-        self.write('SENS:SWE:GRO:COUN %d' % 5)
-        self.clear_averages()
-        time.sleep(self.get_query_sleep())
-        self.averaging_complete()
-        print "finished averaging"
-        if fname is not None:
-            self.save_file(fname)
-        ans = self.read_data()
         return ans
 
     def get_settings(self):

@@ -60,8 +60,9 @@ class Instrument(object):
         time.sleep(self.query_sleep)
         return self.read(timeout)
 
-    def set_query_timeout(self, timeout):
-        self.query_timeout = timeout
+    def set_query_timeout(self, timeout=None):
+        if timeout is not None:
+            self.query_timeout = timeout
 
     def get_query_timeout(self):
         return self.query_timeout
