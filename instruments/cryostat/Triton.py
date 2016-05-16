@@ -5,7 +5,7 @@ Oxford Triton Cryostat Controller (cryostat.py)
 :Author: David Schuster, Ge Yang
 """
 __author__ = 'Ge Yang'
-from instruments import SocketInstrument
+from Instruments import SocketInstrument
 import re
 
 class Triton(SocketInstrument):
