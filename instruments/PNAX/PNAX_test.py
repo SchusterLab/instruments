@@ -99,6 +99,20 @@ class MyTestCase(TestCase):
         plt.plot(fpts, ys)
         plt.show()
 
+    def take_one(self):
+        self.na.set_center_frequency(6.160574e9)
+        self.na.set_span(10e6)
+        self.na.set_power(-5, 1)
+        self.na.set_ifbw(1e3)
+
+        fpts, xs, ys = self.na.take_one()
+
+        plt.figure()
+        plt.plot(fpts, xs)
+        plt.plot(fpts, ys)
+        plt.show()
+
+
     @skip('skip segment sweep, not really needed with PNA-X because of the large memory')
     def nwa_segment_sweep_test(self):
         """Test segmented Sweep"""

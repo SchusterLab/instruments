@@ -14,6 +14,8 @@ import numpy as np
 import glob
 import os.path
 
+def polar2mLog(xs, ys):
+    return np.sqrt(xs**2 + ys**2), np.arctan(ys/xs)
 
 class N5242A(SocketInstrument):
     MAXSWEEPPTS = 1601
@@ -110,7 +112,7 @@ class N5242A(SocketInstrument):
         self.write(':TRIG:SEQ:SOUR ' + source)
 
     def get_trigger_source(self):  # INTERNAL, MANUAL, EXTERNAL,BUS
-        return self.query(':TRIG:SEQ:SOUR?')
+        return self.query(':TRIG:SEQ:SOUR?').strip()
 
     #### Source
 
@@ -171,7 +173,7 @@ class N5242A(SocketInstrument):
         valid options are
         {MLOGarithmic|PHASe|GDELay| SLINear|SLOGarithmic|SCOMplex|SMITh|SADMittance|PLINear|PLOGarithmic|POLar|MLINear|SWR|REAL| IMAGinary|UPHase|PPHase}
         """
-        return self.query("CALC%d:FORM?" % (trace))
+        return self.query("CALC%d:FORM?" % (trace)).strip()
 
     #### File Operations
     def save_file(self, fname):
@@ -223,6 +225,12 @@ class N5242A(SocketInstrument):
         self.set_trigger_source(old_trigger_source)
         self.set_format(old_format)
         return fpts, xs, ys
+
+    def take_one_in_mag_phase(self):
+
+        fpts, xs, ys = self.take_one();
+        mags, phase = polar2mLog(xs, ys)
+        return fpts, mags, phase
 
     def take_one_with_average(self, avg=None):
         if avg is None:
