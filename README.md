@@ -32,6 +32,13 @@ do `pip install instruments`
 
 - Then inside your github `instruments` folder, do `pip install -e .`. The `.` at the end tells `pip` that you are passing the entire local folder in. This is equivalent to `python setup.py develop`. See here: [stackoverflow](http://stackoverflow.com/questions/2087148/can-i-use-pip-instead-of-easy-install-for-python-setup-py-install-dependen).
 
+alternatively, you can do:
+
+```shell
+cd instruments
+python setup.py install
+```
+
 ## To Contribute:
 
 The benefit of building instrument drivers this way, is that it allows us to have a README for each driver, and a consistent testing convention.
