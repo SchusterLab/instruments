@@ -14,8 +14,10 @@ import numpy as np
 import glob
 import os.path
 
+
 def polar2mLog(xs, ys):
-    return np.sqrt(xs**2 + ys**2), np.arctan(ys/xs)
+    return np.sqrt(xs ** 2 + ys ** 2), np.arctan(ys / xs)
+
 
 class N5242A(SocketInstrument):
     MAXSWEEPPTS = 1601
@@ -57,10 +59,14 @@ class N5242A(SocketInstrument):
         return float(self.query(":SENS%d:FREQ:SPAN?" % channel))
 
     def set_sweep_points(self, numpts=1600, channel=1):
-        self.write(":SENSe%d:SWEep:POINts %f" % (channel, numpts))
+        query = ":sense%d:sweep:points %d" % (channel, numpts)
+        print query
+        self.write(query)
 
     def get_sweep_points(self, channel=1):
-        return float(self.query(":SENSe%d:SWEep:POINts?" % (channel)))
+        data = self.query(":sense%d:sweep:points?" % (channel))
+        print 'sweep points query response', [data]
+        return int(data)
 
     #### Averaging
     def set_averages(self, averages, channel=1):
@@ -88,10 +94,9 @@ class N5242A(SocketInstrument):
     def get_ifbw(self, channel=1):
         return float(self.query("SENS%d:bwid?" % (channel)))
 
-    def averaging_complete(self):
+    def operation_complete(self):
         # if self.query("*OPC?") == '+1\n': return True
-        self.write("*OPC?")
-        self.read()
+        self.query("*OPC?")
 
     def trigger_single(self, channel=1):
         self.write('initiate%d:immediate' % channel)
@@ -132,10 +137,55 @@ class N5242A(SocketInstrument):
     def get_output(self):
         return bool(self.query(":OUTPUT?"))
 
+    def delete_trace(self, trace=None):
+        if trace is None:
+            query = "disp:wind:trac:del"
+        else:
+            query = "disp:wind:trac%d:del" % trace
+        self.write(query)
+
+    def delete_measurement(self, name=None):
+        if name is None:
+            # delete all traces
+            self.write(r'calc:par:del:all')
+        else:
+            self.write("calc:par:del '%s'" % name)
+
+    def define_measurement(self, name, channel, mode):
+        query = "calc%d:par:def:ext '%s','%s'" % (channel, name, mode)
+        print query
+        self.write(query)
+
+    def get_measurements(self):
+        data = self.query('calc:par:cat?')
+        if data == '"NO CATALOG"\n':
+            return None
+        else:
+            data_list = data.strip().split(',')
+            return zip(*[iter(data_list)] * 2)
+
+    def select_measurement(self, name=None, channel=1):
+        query = "calc%d:par:sel '%s'" % (channel, name)
+        print query
+        self.write(query)
+
+    def display_measurement(self, name=None, trace=1):
+        query = "disp:wind:trace%d:feed '%s'" % (trace, name)
+        self.write(query)
+
+    def auto_scale(self, trace=None):
+        """
+        Performs an Autoscale on the specified trace in the specified window, providing the best fit display.
+        Autoscale is performed only when the command is sent; it does NOT keep the trace autoscaled indefinitely.
+        """
+        if trace is None:
+            query = "DISP:WIND:TRAC:Y:AUTO"
+        else:
+            query = "disp:wind:trac%d:Y:AUTO" % trace
+        self.write(query)
+
     def set_measure(self, mode='S21', channel=1):
-        # todo: need to fixed
-        print ""
-        self.write("calculate%d:parameter:define 'ch1_a', %s" % (channel, mode))
+        pass
 
     #### Trace Operations
     def set_active_trace(self, channel=1, trace=1, fast=False):
@@ -158,8 +208,11 @@ class N5242A(SocketInstrument):
     def get_active_trace(self, channel=1):
         """set the active trace, need to run after the active trace is set."""
         query_string = "calculate%d:parameter:mnumber:select?" % channel
-        # print query_string
-        return int(self.query(query_string))
+        data = self.query(query_string)
+        if data is None:
+            return data;
+        else:
+            return int(data)
 
     def set_format(self, trace_format='MLOG', trace=1):
         """set_format: need to run after the active trace is set.
@@ -173,33 +226,37 @@ class N5242A(SocketInstrument):
         valid options are
         {MLOGarithmic|PHASe|GDELay| SLINear|SLOGarithmic|SCOMplex|SMITh|SADMittance|PLINear|PLOGarithmic|POLar|MLINear|SWR|REAL| IMAGinary|UPHase|PPHase}
         """
-        return self.query("CALC%d:FORM?" % (trace)).strip()
+        data = self.query("CALC%d:FORM?" % (trace))
+        if data is None:
+            return data
+        else:
+            return data.strip()
 
     #### File Operations
     def save_file(self, fname):
         self.write('MMEMORY:STORE:FDATA \"' + fname + '\"')
 
-    def read_line(self, eof_char='\n', timeout=None):
-        if timeout is None:
-            timeout = self.query_timeout
-        done = False
-        while done is False:
-            buffer_str = self.read(timeout)
-            # print "buffer_str", buffer_str
-            yield buffer_str
-            if buffer_str[-1] == eof_char:
-                done = True
+    # def read_line(self, eof_char='\n', timeout=None):
+    #     if timeout is None:
+    #         timeout = self.query_timeout
+    #     done = False
+    #     while done is False:
+    #         buffer_str = self.read(timeout)
+    #         # print "buffer_str", buffer_str
+    #         yield buffer_str
+    #         if buffer_str[-1] == eof_char:
+    #             done = True
 
     def read_data(self, channel=1, timeout=None):
         """Read current NWA Data, return fpts,mags,phases"""
-        # Note: referece is here: http://na.support.keysight.com/pna/help/latest/Programming/GP-IB_Command_Finder/Calculate/Data.htm
-        if timeout == None:
+        number_of_sweep_points = self.get_sweep_points()
+        if timeout is None:
             timeout = self.query_timeout
         self.write("CALC%d:DATA? FDATA" % channel)
+        time.sleep(self.query_sleep)
         data_str = ''.join(self.read_line(timeout=timeout))
         # print 'data_str ==>"', data_str, '"'
         data = np.fromstring(data_str, dtype=float, sep=',')
-        number_of_sweep_points = self.get_sweep_points()
         fpts = np.linspace(self.get_start_frequency(), self.get_stop_frequency(), number_of_sweep_points)
         if len(data) == 2 * number_of_sweep_points:
             data = data.reshape((-1, 2))
@@ -217,20 +274,25 @@ class N5242A(SocketInstrument):
 
         old_trigger_source = self.get_trigger_source()
         self.set_trigger_source("manual")
+        time.sleep(self.query_sleep) # test if this is crucial
         old_format = self.get_format()
-        self.set_format('polar')
+        if old_format is not 'POL':
+            self.set_format('polar')
+            time.sleep(self.query_sleep) # test if this is crucial
         self.clear_averages(channel=1)
         self.trigger_single(channel=1)
-        fpts, xs, ys = self.read_data()
+        time.sleep(self.query_sleep) # test if this is crucial
+        self.operation_complete()
+        data = self.read_data()
+        fpts, xs, ys = data
         self.set_trigger_source(old_trigger_source)
         self.set_format(old_format)
         return fpts, xs, ys
 
     def take_one_in_mag_phase(self):
-
-        fpts, xs, ys = self.take_one();
-        mags, phase = polar2mLog(xs, ys)
-        return fpts, mags, phase
+        fpts, xs, ys = self.take_one()
+        mags, phases = polar2mLog(xs, ys)
+        return fpts, mags, phases
 
     def take_one_with_average(self, avg=None):
         if avg is None:
@@ -239,7 +301,6 @@ class N5242A(SocketInstrument):
             self.set_averages(avg)
             self.set_trigger_average_mode()
             return self.take_one()
-
 
     def segmented_sweep(self, start, stop, step, output_format='polar'):
         """Take a segmented sweep to achieve higher resolution"""
@@ -277,7 +338,7 @@ class N5242A(SocketInstrument):
             self.clear_averages()
             self.trigger_single()
             time.sleep(self.query_sleep)
-            self.averaging_complete()  # Blocks!
+            self.operation_complete()  # Blocks!
 
             seg_data = self.read_data()
 
@@ -334,7 +395,7 @@ class N5242A(SocketInstrument):
             self.clear_averages()
             self.trigger_single()
             time.sleep(self.query_sleep)
-            self.averaging_complete()  # Blocks!
+            self.operation_complete()  # Blocks!
             self.set_format('slog')
             seg_data = self.read_data()
             self.set_format('mlog')
@@ -442,7 +503,7 @@ def nwa_watch_temperature_sweep(na, fridge, datapath, fileprefix, windows, power
             na.set_ifbw(ifbws[ii])
             na.set_averages(avgs)
             na.trigger_single()
-            na.averaging_complete()  # Blocks!
+            na.operation_complete()  # Blocks!
             na.save_file("%s%04d-%3d-%s-%3.3f.csv" % (datapath, count, ii, fileprefix, Temperature))
             time.sleep(delay)
 

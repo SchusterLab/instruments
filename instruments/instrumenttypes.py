@@ -56,8 +56,9 @@ class Instrument(object):
         # self.read() command, and this should provide a simple and nice synchronous interface that's useful
         # for most experiments. In the future we might want to implement a asynchronous IO interface
         #                                                         --- Ge Yang on fixing #1 hanging query.
+        # Note: for async/line-based query methods, need to override this.
+        #                                                         --- Ge
         self.write(cmd)
-        time.sleep(self.query_sleep)
         return self.read(timeout)
 
     def set_query_timeout(self, timeout=None):
@@ -167,6 +168,10 @@ class SocketInstrument(Instrument):
     def write(self, s):
         if self.enabled: self.socket.send(s + self.term_char)
 
+    def query(self, s):
+        self.write(s)
+        return ''.join(self.read_line())
+
     def read(self, timeout=None):
         # Note: make sure you use query_timeout instead of timeout. self.timeout is for
         # timeout/wait before connection only.
@@ -177,6 +182,21 @@ class SocketInstrument(Instrument):
         ready = select.select([self.socket], [], [], timeout/1000.0)
         if (ready[0] and self.enabled):
             return self.socket.recv(self.recv_length)
+
+    def read_line(self, eof_char='\n', timeout=None):
+        if timeout is None:
+            timeout = self.query_timeout
+        done = False
+        while done is False:
+            buffer_str = self.read(timeout)
+            # print "buffer_str", [buffer_str]
+            if buffer_str is None:
+                pass # done = True
+            elif buffer_str[-len(eof_char):] == eof_char:
+                yield buffer_str
+                done = True
+            else:
+                yield buffer_str
 
 class SerialInstrument(Instrument):
     # todo: the `baudrate` and `querysleep` need to be updated to band_rate and query_sleep

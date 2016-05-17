@@ -7,6 +7,7 @@ Oxford Triton Cryostat Controller (cryostat.py)
 __author__ = 'Ge Yang'
 from Instruments import SocketInstrument
 import re
+import time
 
 class Triton(SocketInstrument):
     default_port = 22518
@@ -37,7 +38,13 @@ class Triton(SocketInstrument):
         return self.get_pressures()[channel]
 
     def get_temperatures(self):
-        temp_string = self.query('temperatures')
+        self.write('temperatures')
+        if self.query_sleep is not None:
+            time.sleep(self.query_sleep)
+        temp_string = ''.join(self.read_line('<end>'))
+        while temp_string.strip() == '':
+            temp_string = ''.join(self.read_line('<end>'))
+
         matches = re.findall(r'.*?name: (?P<name>.*?);.*?temperature: (?P<temperature>.*?);.*', temp_string)
         temps = {}
         for match in matches:
@@ -45,13 +52,18 @@ class Triton(SocketInstrument):
         return temps
 
     def get_temperature(self, channel='MC RuO2'):
-        return self.get_temperatures()[channel]
+        temperatures = self.get_temperatures()
+        # print temperatures
+        if channel in temperatures.keys():
+            return temperatures[channel]
+        else:
+            return None
 
     def get_mc_temperature(self):
-        Temperature = self.get_temperature('MC RuO2')
-        if not Temperature > 0:
-            Temperature = self.get_temperature('MC cernox')
-        return Temperature
+        temperature = self.get_temperature('MC RuO2')
+        if not temperature > 0:
+            temperature = self.get_temperature('MC cernox')
+        return temperature
 
     def get_settings(self):
         settings = SocketInstrument.get_settings(self)

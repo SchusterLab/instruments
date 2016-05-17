@@ -24,10 +24,16 @@ class MyTestCase(unittest.TestCase):
 
     def api_test(self):
         """Test APIs"""
-        self.fridge.set_query_timeout(10000)
+        self.fridge.set_query_timeout(100)
         #### Test Driver Methods
         print "test ===> get_temperature()"
-        self.fridge.get_temperature()
+        self.fridge.query_sleep = 0.1
+        temperature = self.fridge.get_temperature()
+        print [temperature]
+        self.assertTrue(temperature, 'temperature is not None: %s' % temperature)
+
+        mc_temp = self.fridge.get_mc_temperature()
+        print mc_temp
 
 if __name__ == '__main__':
     unittest.main()
