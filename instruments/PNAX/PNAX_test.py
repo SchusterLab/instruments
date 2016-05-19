@@ -70,6 +70,13 @@ class MyTestCase(TestCase):
         print "test ===> set_averages(1)"
         self.na.set_averages(1)
 
+        print "test ===> get_electrical_delay()"
+        delay = self.na.get_electrical_delay()
+        self.assertTrue(delay is not None, "delay should be a number")
+
+        print "test ===> set_electrical_delay(5E-9)"
+        self.na.set_electrical_delay(5e-9)
+
         print "test ===> get_format(1)"
         self.na.get_format(1)
 

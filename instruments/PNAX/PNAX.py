@@ -232,6 +232,19 @@ class N5242A(SocketInstrument):
         else:
             return data.strip()
 
+    def set_electrical_delay(self, seconds, channel=1):
+        query = "calc%d:corr:edel:time %e" % (channel, seconds)
+        print query
+        self.write(query)
+
+    def get_electrical_delay(self, channel=1):
+        query = "calc%d:corr:edel:time?" % channel
+        data = self.query(query)
+        if data is None:
+            return None
+        else:
+            return float(data.strip())
+
     #### File Operations
     def save_file(self, fname):
         self.write('MMEMORY:STORE:FDATA \"' + fname + '\"')
