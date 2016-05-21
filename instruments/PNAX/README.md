@@ -39,11 +39,12 @@ plt.show()
 
 ```python
 #  this one sets the averaging
-nwa.set_averages_and_group_count(50)
+nwa.set_averages_and_group_count(50)    
+nwa.setup_take()
 for i in range(1000):
-    nwa.setup_take()
-    
-
+    sweep_points = 1000
+    data = nwa.take(sweep_points)
+    # do whatever you want with the data.
 ```
 
 
