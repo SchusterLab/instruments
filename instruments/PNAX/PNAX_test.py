@@ -138,11 +138,14 @@ class MyTestCase(TestCase):
         plt.show()
 
     def take_one(self):
-        self.na.set_center_frequency(6.160574e9)
+        self.na.set_center_frequency(6.14727e9)
         self.na.set_span(10e6)
-        self.na.set_power(-5, 1)
+        self.na.set_power(-45, 1)
         self.na.set_ifbw(1e3)
         self.na.set_sweep_points(3000)
+        self.na.set_averages(100)
+        self.na.set_sweep_group_count(100)
+        self.na.set_average_state()
 
         self.na.delete_trace()
         self.na.delete_measurement()
@@ -178,22 +181,30 @@ class MyTestCase(TestCase):
         self.na.set_active_trace(1, 1, True)
         self.na.get_active_trace()
         sleep(1)
+
         self.na.auto_scale()
 
-        self.na.set_center_frequency(6.160574e9)
+        self.na.set_center_frequency(6.14727e9)
         self.na.set_span(10e6)
-        self.na.set_power(-5, 1)
-        self.na.set_ifbw(1e3)
-        self.na.set_sweep_points(3000)
+        self.na.set_power(-45, 1)
+        self.na.set_ifbw(100e3)
+        self.na.set_sweep_points(10000)
+        self.na.set_averages(100)
+        self.na.set_sweep_group_count(100)
+        self.na.set_average_state()
+
+
         sleep(0.1)
         sweep_points = self.na.get_sweep_points()
         self.assertTrue(sweep_points, "sweep points need to be a number")
 
         fpts, mags, phases = self.na.take_one_in_mag_phase()
 
+        self.na.auto_scale()
+
         plt.figure()
         plt.plot(fpts, mags)
-        plt.plot(fpts, phases)
+        # plt.plot(fpts, phases)
         plt.show()
 
     @skip('skip segment sweep, not really needed with PNA-X because of the large memory')

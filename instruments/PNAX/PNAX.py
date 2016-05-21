@@ -65,8 +65,42 @@ class N5242A(SocketInstrument):
 
     def get_sweep_points(self, channel=1):
         data = self.query(":sense%d:sweep:points?" % (channel))
-        print 'sweep points query response', [data]
+        # print 'sweep points query response', [data]
         return int(data)
+
+    def set_sweep_mode(self, mode='CONT'):
+        """
+        Sets the number of trigger signals the specified channel will ACCEPT
+
+        HOLD - channel will not trigger
+        CONTinuous - channel triggers indefinitely
+        GROups - channel accepts the number of triggers specified with the last SENS:SWE:GRO:COUN <num>.
+        SINGle - channel accepts ONE trigger, then goes to HOLD.
+        """
+
+        allowed_modes = ['cont', 'continuous', 'hold', "groups", 'gro', 'sing', 'single']
+        if mode.lower() not in allowed_modes:
+            return
+        else :
+            self.write("SENS:SWE:MODE %s" % mode)
+
+    def get_sweep_mode(self):
+        """
+        Returns the sweep mode.
+        """
+        data = self.query("SENS:SWE:MODE?")
+        if data is None:
+            return None
+        else:
+            return data.strip()
+
+    def set_sweep_group_count(self, count=None):
+        if count is None:
+            return
+        else:
+            query = "SENS:SWE:GRO:COUN %d" % count
+            self.write(query)
+
 
     #### Averaging
     def set_averages(self, averages, channel=1):
@@ -94,27 +128,52 @@ class N5242A(SocketInstrument):
     def get_ifbw(self, channel=1):
         return float(self.query("SENS%d:bwid?" % (channel)))
 
-    def operation_complete(self):
-        # if self.query("*OPC?") == '+1\n': return True
-        self.query("*OPC?")
+    def get_operation_completion(self):
+        data = self.query("*OPC?")
+        if data is None:
+            return False
+        else:
+            return bool(int(data.strip()))
+
+    def set_trigger_continuous(self, state=True):
+        if state:
+            _state = "on"
+        else:
+            _state = "off"
+        self.write('initiate:continuous ' + _state)
 
     def trigger_single(self, channel=1):
         self.write('initiate%d:immediate' % channel)
 
-    def set_trigger_average_mode(self, state=True):
+    def set_trigger_average_mode (self, mode=None):
+        allowed_modes = ['poin', 'point', 'sweep']
+        if mode is None:
+            return
+        elif mode.lower() in allowed_modes:
+            self.write('sense:AVER:mode ' + mode)
+        else:
+            print "trigger average mode need to be one of " + ', '.join(allowed_modes)
+
+
+    def get_trigger_average_mode (self):
+        data = self.query('sense:AVER:mode?')
+        if data is None: return None
+        else: return data.strip()
+
+    def set_trigger_average(self, state=True):
         if state:
             self.write('sense:AVER ON')
         else:
             self.write('sense:AVER OFF')
 
-    def get_trigger_average_mode(self):
+    def get_trigger_average(self):
         return bool(self.query('sense:AVER?'))
 
     def set_trigger_source(self, source="immediate"):  # IMMEDIATE, MANUAL, EXTERNAL
         allowed_sources = ['ext', 'imm', 'man', 'immediate', 'external', 'manual']
         if source.lower() not in allowed_sources:
-            raise "source need to be one of " + allowed_sources
-        self.write(':TRIG:SEQ:SOUR ' + source)
+            print "source need to be one of " + ', '.join(allowed_sources)
+        self.write('TRIG:SEQ:SOUR ' + source)
 
     def get_trigger_source(self):  # INTERNAL, MANUAL, EXTERNAL,BUS
         return self.query(':TRIG:SEQ:SOUR?').strip()
@@ -263,10 +322,12 @@ class N5242A(SocketInstrument):
     def read_data(self, channel=1, timeout=None):
         """Read current NWA Data, return fpts,mags,phases"""
         number_of_sweep_points = self.get_sweep_points()
+
         if timeout is None:
             timeout = self.query_timeout
+        self.get_operation_completion()
         self.write("CALC%d:DATA? FDATA" % channel)
-        time.sleep(self.query_sleep)
+        #time.sleep(self.query_sleep)
         data_str = ''.join(self.read_line(timeout=timeout))
         # print 'data_str ==>"', data_str, '"'
         data = np.fromstring(data_str, dtype=float, sep=',')
@@ -285,20 +346,16 @@ class N5242A(SocketInstrument):
         either saving it to fname or returning it.  This function does not set up
         the format or anything else it just starts, blocks, and grabs the next trace."""
 
-        old_trigger_source = self.get_trigger_source()
-        self.set_trigger_source("manual")
-        time.sleep(self.query_sleep) # test if this is crucial
+        self.set_trigger_source("imm")
         old_format = self.get_format()
         if old_format is not 'POL':
             self.set_format('polar')
-            time.sleep(self.query_sleep) # test if this is crucial
-        self.clear_averages(channel=1)
-        self.trigger_single(channel=1)
-        time.sleep(self.query_sleep) # test if this is crucial
-        self.operation_complete()
+        self.set_trigger_continuous()
+        self.clear_averages()
+        # this is the command that triggers the averaging. Execute right before read data.
+        self.set_sweep_mode('gro')
         data = self.read_data()
         fpts, xs, ys = data
-        self.set_trigger_source(old_trigger_source)
         self.set_format(old_format)
         return fpts, xs, ys
 
@@ -351,7 +408,7 @@ class N5242A(SocketInstrument):
             self.clear_averages()
             self.trigger_single()
             time.sleep(self.query_sleep)
-            self.operation_complete()  # Blocks!
+            self.get_operation_completion()  # Blocks!
 
             seg_data = self.read_data()
 
@@ -408,7 +465,7 @@ class N5242A(SocketInstrument):
             self.clear_averages()
             self.trigger_single()
             time.sleep(self.query_sleep)
-            self.operation_complete()  # Blocks!
+            self.get_operation_completion()  # Blocks!
             self.set_format('slog')
             seg_data = self.read_data()
             self.set_format('mlog')
@@ -516,7 +573,7 @@ def nwa_watch_temperature_sweep(na, fridge, datapath, fileprefix, windows, power
             na.set_ifbw(ifbws[ii])
             na.set_averages(avgs)
             na.trigger_single()
-            na.operation_complete()  # Blocks!
+            na.get_operation_completion()  # Blocks!
             na.save_file("%s%04d-%3d-%s-%3.3f.csv" % (datapath, count, ii, fileprefix, Temperature))
             time.sleep(delay)
 
