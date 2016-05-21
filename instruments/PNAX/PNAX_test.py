@@ -115,7 +115,6 @@ class MyTestCase(TestCase):
 
     def take_one_averaged(self):
         """should be able to clear average and take averaged trace"""
-        self.na.set_default_state()
         self.na.set_center_frequency(6.160574e9)
         self.na.set_span(10e6)
         self.na.set_power(-5, 1)
@@ -159,7 +158,7 @@ class MyTestCase(TestCase):
         self.na.get_active_trace()
         self.na.auto_scale()
 
-        fpts, xs, ys = self.na.take_one()
+        fpts, xs, ys = self.na.take()
 
         plt.figure()
         plt.plot(fpts, xs)
@@ -170,17 +169,9 @@ class MyTestCase(TestCase):
         self.na.set_query_timeout(10000)
 
         # this is always going to give an error message regardless
-        self.na.delete_trace()
-        self.na.delete_measurement()
+        self.na.clear_traces()
 
-        self.na.define_measurement('S21', channel=1, mode='S21')
-        self.na.display_measurement('S21')
-        self.na.select_measurement('S21')
-        sleep(0.5)
-        # Important Note: you have to set an active trace before setting the format of a trace
-        self.na.set_active_trace(1, 1, True)
-        self.na.get_active_trace()
-        sleep(1)
+        self.na.setup_measurement("S21")
 
         self.na.auto_scale()
 
@@ -189,11 +180,10 @@ class MyTestCase(TestCase):
         self.na.set_power(-45, 1)
         self.na.set_ifbw(100e3)
         self.na.set_sweep_points(10000)
+        # need to set both to the same, so that take one can use the group trigger.
         self.na.set_averages(100)
         self.na.set_sweep_group_count(100)
         self.na.set_average_state()
-
-
         sleep(0.1)
         sweep_points = self.na.get_sweep_points()
         self.assertTrue(sweep_points, "sweep points need to be a number")
@@ -206,40 +196,6 @@ class MyTestCase(TestCase):
         plt.plot(fpts, mags)
         # plt.plot(fpts, phases)
         plt.show()
-
-    @skip('skip segment sweep, not really needed with PNA-X because of the large memory')
-    def nwa_segment_sweep_test(self):
-        """Test segmented Sweep"""
-        self.na.set_default_state()
-        self.na.set_power(-35, 1)
-        self.na.set_ifbw(1e3)
-        self.na.set_averages(1)
-
-        self.na.get_start_frequency()
-        self.na.get_stop_frequency()
-
-        self.na.set_query_timeout(40e3)
-        set_format = self.na.set_format('mlog')
-        fpts, mags, phases = self.na.segmented_sweep(2.3e9, 2.5e9, 5e3, 'polar')
-
-        plt.figure()
-        plt.plot(fpts, mags)
-        plt.plot(fpts, phases)
-        plt.show()
-
-    @skip('skip redundant test')
-    def nwa_test3(self):
-        pass
-        self.na.set_trigger_average_mode(False)
-        self.na.set_power(-20)
-        self.na.set_ifbw(1e3)
-        self.na.set_sweep_points(3000)
-        self.na.set_averages(10)
-        self.na.set_average_state(True)
-
-        print self.na.get_settings()
-        self.na.clear_averages()
-        self.na.take_one_averaged_trace("test.csv")
 
 
 if __name__ == '__main__':

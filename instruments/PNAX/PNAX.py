@@ -81,7 +81,7 @@ class N5242A(SocketInstrument):
         allowed_modes = ['cont', 'continuous', 'hold', "groups", 'gro', 'sing', 'single']
         if mode.lower() not in allowed_modes:
             return
-        else :
+        else:
             self.write("SENS:SWE:MODE %s" % mode)
 
     def get_sweep_mode(self):
@@ -319,20 +319,19 @@ class N5242A(SocketInstrument):
     #         if buffer_str[-1] == eof_char:
     #             done = True
 
-    def read_data(self, channel=1, timeout=None):
+    def read_data(self, sweep_points=None, channel=1, timeout=None):
         """Read current NWA Data, return fpts,mags,phases"""
-        number_of_sweep_points = self.get_sweep_points()
+        if sweep_points is None:
+            sweep_points = self.get_sweep_points()
 
         if timeout is None:
             timeout = self.query_timeout
         self.get_operation_completion()
         self.write("CALC%d:DATA? FDATA" % channel)
-        #time.sleep(self.query_sleep)
         data_str = ''.join(self.read_line(timeout=timeout))
-        # print 'data_str ==>"', data_str, '"'
         data = np.fromstring(data_str, dtype=float, sep=',')
-        fpts = np.linspace(self.get_start_frequency(), self.get_stop_frequency(), number_of_sweep_points)
-        if len(data) == 2 * number_of_sweep_points:
+        fpts = np.linspace(self.get_start_frequency(), self.get_stop_frequency(), sweep_points)
+        if len(data) == 2 * sweep_points:
             data = data.reshape((-1, 2))
             data = data.transpose()
             return np.vstack((fpts, data))
@@ -340,151 +339,65 @@ class N5242A(SocketInstrument):
             return np.vstack((fpts, data))
 
     #### Meta
-
-    def take_one(self):
-        """Tell Network Analyzer to take a single averaged trace and grab data,
-        either saving it to fname or returning it.  This function does not set up
-        the format or anything else it just starts, blocks, and grabs the next trace."""
-
-        self.set_trigger_source("imm")
-        old_format = self.get_format()
-        if old_format is not 'POL':
-            self.set_format('polar')
-        self.set_trigger_continuous()
+    
+    def take(self, sweep_points=None):
+        """
+        Important:
+            the PNA-X need to be in the following mode
+                trigger source:IMMediate,
+                format:POLar,
+                trigger:CONTinuous ON
+        :param sweep_points:
+            by taking in a sweep_points parameter, we do not need to query the PNA-X for this
+            parameter. This way we can save some time.
+        :return:
+            either fpts, xs, ys,
+            or     fpts, mags.
+        """
         self.clear_averages()
         # this is the command that triggers the averaging. Execute right before read data.
         self.set_sweep_mode('gro')
-        data = self.read_data()
-        fpts, xs, ys = data
-        self.set_format(old_format)
-        return fpts, xs, ys
+        data = self.read_data(sweep_points)
+        return data
 
-    def take_one_in_mag_phase(self):
-        fpts, xs, ys = self.take_one()
+    def take_in_mag_phase(self, sweep_points=None):
+        fpts, xs, ys = self.take(sweep_points)
         mags, phases = polar2mLog(xs, ys)
         return fpts, mags, phases
 
-    def take_one_with_average(self, avg=None):
-        if avg is None:
-            return self.take_one()
-        else:
-            self.set_averages(avg)
-            self.set_trigger_average_mode()
-            return self.take_one()
+    def take_one_in_mag_phase(self, sweep_points=None):
+        self.setup_take()
+        fpts, xs, ys = self.take(sweep_points)
+        mags, phases = polar2mLog(xs, ys)
+        return fpts, mags, phases
 
-    def segmented_sweep(self, start, stop, step, output_format='polar'):
-        """Take a segmented sweep to achieve higher resolution"""
-        max_sweep_points = 4000
-        span = stop - start
-        total_sweep_pts = span / step
-        if total_sweep_pts <= max_sweep_points:
-            print "Segmented sweep unnecessary"
-        segments = np.ceil(total_sweep_pts / max_sweep_points)
-        segspan = span / segments
-        starts = start + segspan * np.arange(0, segments)
-        stops = starts + segspan
-        print "full span is %f GHz, in %d segments, with a span of %fMHz each" % (span / 1e9, segments, segspan / 1e6)
+    def setup_take(self, averages=None, averages_state=None):
+        self.set_trigger_source("imm")
+        self.set_format('polar')
+        self.set_trigger_continuous()
+        
+        if averages is not None:
+            self.set_averages_and_group_count(averages, True)
+        elif averages_state is not None:
+            self.set_average_state(averages_state)
 
-        time.sleep(self.query_sleep)
+    def set_averages_and_group_count(self, averages, state=None):
+        self.set_averages(averages)
+        self.set_sweep_group_count(averages)
+        if state is not None:
+            self.set_average_state(state)
 
-        # Set Save old settings and set up for automated data taking
-        original_output_format = self.get_format()
-        original_timeout = self.get_query_timeout()
-        original_trigger_average_mode = self.get_trigger_average_mode()
+    def clear_traces(self):
+        self.delete_trace()
+        self.delete_measurement()
 
-        self.set_query_timeout(self.query_timeout)
-        self.set_trigger_source('manual')
-        self.set_active_trace(1)
-        # only the polar and smith are outputing two number per data point
-        self.set_format(trace_format=output_format)
-
-        self.set_span(segspan)
-        segs = []
-        for start, stop in zip(starts, stops):
-            print '.',
-            self.set_start_frequency(start)
-            self.set_stop_frequency(stop)
-
-            self.clear_averages()
-            self.trigger_single()
-            time.sleep(self.query_sleep)
-            self.get_operation_completion()  # Blocks!
-
-            seg_data = self.read_data()
-
-            seg_data = seg_data.transpose()
-            last = seg_data[-1]
-            seg_data = seg_data[:-1].transpose()
-            segs.append(seg_data)
-        segs.append(np.array([last]).transpose())
-        time.sleep(self.query_sleep)
-
-        self.set_format(trace_format=original_output_format)
-        self.set_query_timeout(original_timeout)
-        self.set_trigger_average_mode(original_trigger_average_mode)
-        self.set_trigger_source('IMM')
-
-        return np.hstack(segs)
-
-    def segmented_sweep2(self, start, stop, step, sweep_pts=None, fname=None, save_segments=True):
-        """Take a segmented sweep to achieve higher resolution"""
-        span = stop - start
-        total_sweep_pts = span / step
-        if total_sweep_pts < 1600:
-            print "Segmented sweep unnecessary"
-            self.set_sweep_points(max(sweep_pts, total_sweep_pts))
-            self.set_start_frequency(start)
-            self.set_stop_frequency(stop)
-            return self.take_one_averaged_trace(fname)
-        segments = np.ceil(total_sweep_pts / 1600.)
-        segspan = span / segments
-        starts = start + segspan * np.arange(0, segments)
-        stops = starts + segspan
-
-        #        print span
-        #        print segments
-        #        print segspan
-
-        # Set Save old settings and set up for automated data taking
-        time.sleep(self.query_sleep)
-        old_format = self.get_format()
-        old_timeout = self.get_query_timeout()
-        old_avg_mode = self.get_trigger_average_mode()
-
-        self.set_query_timeout(self.query_timeout)
-        self.set_trigger_average_mode(True)
-        self.set_trigger_source('BUS')
-        self.set_format('mlog')
-
-        self.set_span(segspan)
-        segs = []
-        for start, stop in zip(starts, stops):
-            self.set_start_frequency(start)
-            self.set_stop_frequency(stop)
-
-            self.clear_averages()
-            self.trigger_single()
-            time.sleep(self.query_sleep)
-            self.get_operation_completion()  # Blocks!
-            self.set_format('slog')
-            seg_data = self.read_data()
-            self.set_format('mlog')
-            seg_data = seg_data.transpose()
-            last = seg_data[-1]
-            seg_data = seg_data[:-1].transpose()
-            segs.append(seg_data)
-            if (fname is not None) and save_segments:
-                np.savetxt(fname, np.transpose(segs), delimiter=',')
-        segs.append(np.array([last]).transpose())
-        time.sleep(self.query_sleep)
-        self.set_format(old_format)
-        self.set_query_timeout(old_timeout)
-        self.set_trigger_average_mode(old_avg_mode)
-        self.set_trigger_source('INTERNAL')
-        ans = np.hstack(segs)
-        if fname is not None:
-            np.savetxt(fname, np.transpose(ans), delimiter=',')
-        return ans
+    def setup_measurement(self, name, mode=None):
+        if mode is None:
+            mode = name
+        self.define_measurement(name, 1, mode)
+        self.display_measurement(name)
+        self.select_measurement(name)
+        self.set_active_trace(1, 1, True)
 
     def get_settings(self):
         settings = {"start": self.get_start_frequency(), "stop": self.get_stop_frequency(),
@@ -494,109 +407,17 @@ class N5242A(SocketInstrument):
                     }
         return settings
 
-    def configure(self, start=None, stop=None, center=None, span=None, power=None, ifbw=None, sweep_pts=None, avgs=None,
-                  defaults=False, remote=False):
-        if defaults:       self.set_default_state()
-        if remote:                          self.set_remote_state()
-        if start is not None:            self.set_start_frequency(start)
-        if stop is not None:            self.set_stop_frequency(stop)
-        if center is not None:          self.set_center_frequency(center)
-        if span is not None:            self.set_span(span)
-        if power is not None:         self.set_power(power)
-        if ifbw is not None:            self.set_ifbw(ifbw)
-        if sweep_pts is not None:   self.set_sweep_points(sweep_pts)
-        if avgs is not None:            self.set_averages(avgs)
-
-    def set_remote_state(self):
-        pass
-        # self.set_trigger_source('BUS')
-        # self.set_trigger_average_mode(True)
-        # self.set_query_timeout(self.query_timeout)
-        # self.set_format('slog')
-
-    def set_default_state(self):
-        # under construction
-        pass
-        # self.set_sweep_points()
-        # self.set_format()
-        # self.set_trigger_source()
-        # self.set_trigger_average_mode(False)
-        # self.write(":INIT1:CONT ON")
-
-
-def condense_nwa_files(datapath, prefix):
-    prefixes, data = load_nwa_dir(datapath)
-    np.save(prefix, np.array(data))
-
-
-def load_nwa_file(filename):
-    """return three arrays: frequency magnitude and phase"""
-    return np.transpose(np.loadtxt(filename, skiprows=3, delimiter=','))
-
-
-def load_nwa_dir(datapath):
-    fnames = glob.glob(os.path.join(datapath, "*.CSV"))
-    fnames.sort()
-    prefixes = [os.path.split(fname)[-1] for fname in fnames]
-    data = [load_nwa_file(fname) for fname in fnames]
-    return prefixes, data
-
-
-def nwa_watch_temperature_sweep(na, fridge, datapath, fileprefix, windows, powers, ifbws, avgs, timeout=10000, delay=0):
-    """nwa_watch_temperature_sweep monitors the temperature (via fridge) and tells the network analyzer (na) to watch certain windows
-    at the specified powers, ifbws, and avgs specified
-    windows= [(center1,span1),(center2,span2), ...]
-    powers= [power1,power2,...]
-    ifbws=[ifbw1,ifbw2,...]
-    avgs=[avgs1,avgs2,...]"""
-    f = open(datapath + fileprefix + ".cfg", 'w')
-    f.write('datapath: %s\nfileprefix: %s\n\Window #\tCenter\tSpan\tPower\tIFBW\tavgs' % (datapath, fileprefix))
-    for ii, w in enumerate(windows):
-        f.write('%d\t%f\t%f\t%f\t%f\t%d' % (windows[ii][0], windows[ii][1], powers[ii], ifbws[ii], avgs[ii]))
-    f.close()
-    na.set_trigger_average_mode(True)
-    na.set_sweep_points()
-    na.set_average_state(True)
-    na.set_query_timeout(timeout)
-    na.set_format('slog')
-    na.set_trigger_source('BUS')
-    count = 0
-    while (True):
-        for ii, w in enumerate(windows):
-            Temperature = fridge.get_temperature('MC RuO2')
-            if not Temperature > 0:
-                Temperature = fridge.get_temperature('MC cernox')
-            print "Trace: %d\t\tWindow: %d\tTemperature: %3.3f" % (count, ii, Temperature)
-            na.set_center_frequency(w[0])
-            na.set_span(w[1])
-            na.set_power(powers[ii])
-            na.set_ifbw(ifbws[ii])
-            na.set_averages(avgs)
-            na.trigger_single()
-            na.get_operation_completion()  # Blocks!
-            na.save_file("%s%04d-%3d-%s-%3.3f.csv" % (datapath, count, ii, fileprefix, Temperature))
-            time.sleep(delay)
-
-
-def convert_nwa_files_to_hdf(nwa_file_dir, h5file, sweep_min, sweep_max, sweep_label="B Field", ext=".CSV"):
-    import glob, h5py, csv
-    hfile = h5py.File(h5file)
-    files = glob.glob(nwa_file_dir + "*" + ext)
-    n_files = len(files)
-    for j, fn in enumerate(files):
-        f = open(fn, 'r')
-        # Skip Header
-        for i in range(3):
-            f.readline()
-        rows = np.array((csv.reader(f)))
-        if j is 0:
-            n_points = len(rows)
-            for t in ["mag", "phase"]:
-                hfile[t] = np.zeros((n_points, n_files))
-                hfile[t].attrs["_axes"] = ((rows[0][0], rows[-1][0]), (sweep_min, sweep_max))
-                hfile[t].attrs["_axes_labels"] = ("Frequency", sweep_label, "S21")
-        hfile["mag"][:, j] = rows[:, 1]
-        hfile["phase"][:, j] = rows[:, 2]
+    def configure(self, start=None, stop=None, center=None, span=None,
+                  power=None, ifbw=None, sweep_points=None, averages=None):
+        if start is not None:      self.set_start_frequency(start)
+        if stop is not None:       self.set_stop_frequency(stop)
+        if center is not None:     self.set_center_frequency(center)
+        if span is not None:       self.set_span(span)
+        if power is not None:      self.set_power(power)
+        if ifbw is not None:       self.set_ifbw(ifbw)
+        if sweep_points is not None:  self.set_sweep_points(sweep_points)
+        if averages is not None:
+            self.set_averages_and_group_count(averages)
 
 
 if __name__ == '__main__':
