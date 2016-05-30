@@ -9,7 +9,7 @@
 # ======================================================
 #
 __author__ = 'Ge Yang'
-from Instruments import SocketInstrument
+from instruments import SocketInstrument
 import time
 import numpy as np
 import glob
