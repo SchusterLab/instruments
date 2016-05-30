@@ -52,10 +52,17 @@ class Triton(SocketInstrument):
         return temps
 
     def get_temperature(self, channel='MC RuO2'):
-        temperatures = self.get_temperatures()
-        # print temperatures
-        if channel in temperatures.keys():
-            return temperatures[channel]
+        # use buffered temperature data.
+        now = time.time()
+        if not hasattr(self, 'temperatures') or \
+                        'time' not in self.temperatures.keys() or \
+                        (now - self.temperatures['time']) > 6.0:
+            self.temperatures = self.get_temperatures()
+            if self.temperatures is not None:
+                self.temperatures['time'] = time.time()
+
+        if channel in self.temperatures.keys():
+            return self.temperatures[channel]
         else:
             return None
 

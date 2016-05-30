@@ -42,6 +42,9 @@ plt.show()
 nwa.set_averages_and_group_count(50)    
 nwa.setup_take()
 for i in range(1000):
+    # giving the take command a `sweep_points` parameter speeds up the 
+    # data taking, because it doesn't need to query the PNA-X to figure 
+    # it out
     sweep_points = 1000
     data = nwa.take(sweep_points)
     # do whatever you want with the data.

@@ -4,6 +4,7 @@
 # reference the programming manual here: http://na.support.keysight.com/pna/help/index.html?id=1000001808-1:epsg:man
 # and specifically here: New Programming Commands:
 # http://na.support.keysight.com/pna/help/latest/help.htm
+# help: 1 800 829-4444
 #
 # ======================================================
 #
@@ -15,7 +16,7 @@ import glob
 import os.path
 
 
-def polar2mLog(xs, ys):
+def polar2mag(xs, ys):
     return np.sqrt(xs ** 2 + ys ** 2), np.arctan(ys / xs)
 
 
@@ -362,13 +363,17 @@ class N5242A(SocketInstrument):
 
     def take_in_mag_phase(self, sweep_points=None):
         fpts, xs, ys = self.take(sweep_points)
-        mags, phases = polar2mLog(xs, ys)
+        mags, phases = polar2mag(xs, ys)
         return fpts, mags, phases
 
     def take_one_in_mag_phase(self, sweep_points=None):
+        _trig_source = self.get_trigger_source()
+        _format = self.get_format()
         self.setup_take()
         fpts, xs, ys = self.take(sweep_points)
-        mags, phases = polar2mLog(xs, ys)
+        mags, phases = polar2mag(xs, ys)
+        self.set_trigger_source(_trig_source)
+        self.set_format(_format)
         return fpts, mags, phases
 
     def setup_take(self, averages=None, averages_state=None):
