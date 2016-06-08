@@ -179,6 +179,24 @@ class N5242A(SocketInstrument):
     def get_trigger_source(self):  # INTERNAL, MANUAL, EXTERNAL,BUS
         return self.query(':TRIG:SEQ:SOUR?').strip()
 
+    def set_external_trigger_mode(self, trigger_type, slope=1):
+        """
+        Specifies the type of EXTERNAL trigger input detection used to listen for signals on the Meas Trig IN connectors.
+        Edge triggers are most commonly used.
+
+        slope specifies the polarity expected by the external trigger input circuitry.
+        slope = 0 : POSitive --> rising Edge (trigger_type='EDGE') or High Level (trigger_type='LEVEL')
+        slope = 1 : NEGative --> falling Edge (trigger_type='EDGE') or Low Level (trigger_type='LEVEl')
+        """
+        if trigger_type.upper() in ["EDGE", "LEVEL"]:
+            self.write("TRIG:TYPE %s"%trigger_type)
+            if slope > 0:
+                self.write("TRIG:SLOP POS")
+            else:
+                self.write("TRIG:SLOP NEG")
+        else:
+            raise ValueError("Input not understood!")
+
     #### Source
 
     def set_power(self, power, channel=1):
